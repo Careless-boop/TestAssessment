@@ -1,5 +1,7 @@
 ﻿using CsvHelper;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Configuration;
+using Serilog;
 using System.Data;
 using System.Globalization;
 using TestAssessment.Mapping;
@@ -9,15 +11,36 @@ namespace TestAssessment
 {
     internal class Program
     {
-        const string connectionString = "Data Source=CARELESS\\SQLEXPRESS;Integrated Security=True;Trust Server Certificate=True;Initial Catalog=TestAssessmentDb;";
+        private static string? _connectionString;
+        private static IConfigurationRoot _configuration;
+        private static bool _saveDuplicates = false;
 
         static void Main(string[] args)
         {
-            Console.WriteLine("ETL Test Assessment.");
+            if(args.Length > 0)
+            {
+                _saveDuplicates = bool.TryParse(args[0], out _saveDuplicates);
+            }
+
+            ConfigureAppSettings();
+            ConfigureSerilog();
+
+            _connectionString = _configuration.GetConnectionString("DefaultConnection");
+            if(string.IsNullOrEmpty(_connectionString))
+            {
+                Log.Error("Connection string not found.");
+                Log.CloseAndFlush();
+                return;
+            }
+
+            Log.Information("Connection string loaded.");
+
+            Log.Information("ETL Test Assessment.");
 
             // Initialize table if needed
             if (!InitTable())
             {
+                Log.CloseAndFlush();
                 return;
             }
 
@@ -25,6 +48,7 @@ namespace TestAssessment
             string? csvPath = GetPath();
             if (csvPath is null)
             {
+                Log.CloseAndFlush();
                 return;
             }
 
@@ -36,7 +60,8 @@ namespace TestAssessment
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Error retrieving EST timezone: " + ex.Message);
+                Log.Error("Error retrieving EST timezone: " + ex.Message);
+                Log.CloseAndFlush();
                 return;
             }
 
@@ -46,16 +71,41 @@ namespace TestAssessment
             // Write duplicate records to CSV file
             if (duplicateTrips.Any())
             {
-                WriteDuplicates(duplicateTrips);
-                Console.WriteLine($"Found and removed {duplicateTrips.Count} duplicate records. They have been written to duplicates.csv.");
+                Log.Warning($"Found and removed {duplicateTrips.Count} duplicate records.");
+                if(_saveDuplicates)
+                {
+                    WriteDuplicates(duplicateTrips);
+                }
             }
             else
             {
-                Console.WriteLine("No duplicate records found.");
+                Log.Information("No duplicate records found.");
             }
 
             // Bulk insert the valid records into the database
             BulkInsertTrips(validTrips);
+        }
+
+        /// <summary>
+        /// Builds the IConfigurationRoot from appsettings.json
+        /// </summary>
+        private static void ConfigureAppSettings()
+        {
+            // The base path is typically the folder where the compiled assembly is located
+            _configuration = new ConfigurationBuilder()
+                .SetBasePath(AppContext.BaseDirectory)
+                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                .Build();
+        }
+
+        /// <summary>
+        /// Reads Serilog settings from the _configuration object and sets up the global logger.
+        /// </summary>
+        private static void ConfigureSerilog()
+        {
+            Log.Logger = new LoggerConfiguration()
+                .ReadFrom.Configuration(_configuration)
+                .CreateLogger();
         }
 
         /// <summary>
@@ -67,7 +117,8 @@ namespace TestAssessment
             string? csvPath = Console.ReadLine();
             if (!File.Exists(csvPath))
             {
-                Console.WriteLine("File not found. Exiting.");
+                Log.Error("File not found. Exiting.");
+                Log.CloseAndFlush();
                 return null;
             }
             return csvPath;
@@ -99,7 +150,7 @@ namespace TestAssessment
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Error processing row {csv.Context.Parser.RawRow}");
+                        Log.Warning($"Error processing row {csv.Context.Parser.RawRow}");
                         errorRows++;
                         continue; // Skip this row and continue with the next.
                     }
@@ -125,7 +176,7 @@ namespace TestAssessment
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Error converting times on row {csv.Context.Parser.RawRow}: {ex.Message}");
+                        Log.Warning($"Error converting times on row {csv.Context.Parser.RawRow}: {ex.Message}");
                         continue;
                     }
 
@@ -141,7 +192,7 @@ namespace TestAssessment
                     }
                 }
             }
-            Console.WriteLine($"Rows with defects found : {errorRows}");
+            Log.Information($"Rows with defects found : {errorRows}");
             return (validTrips, duplicateTrips);
         }
 
@@ -161,6 +212,7 @@ namespace TestAssessment
                     csvWriter.NextRecord();
                 }
             }
+            Log.Information("Duplicates have been written to duplicates.csv.");
         }
 
         /// <summary>
@@ -168,7 +220,7 @@ namespace TestAssessment
         /// </summary>
         static void BulkInsertTrips(List<TaxiTrip> validTrips)
         {
-            using (var bulkCopy = new SqlBulkCopy(connectionString))
+            using (var bulkCopy = new SqlBulkCopy(_connectionString))
             {
                 bulkCopy.DestinationTableName = "dbo.TaxiTrips";
 
@@ -204,7 +256,7 @@ namespace TestAssessment
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("Error during bulk insertion: " + ex.Message);
+                    Log.Error("Error during bulk insertion: " + ex.Message);
                 }
             }
         }
@@ -234,7 +286,7 @@ namespace TestAssessment
         {
             try
             {
-                using (var connection = new SqlConnection(connectionString))
+                using (var connection = new SqlConnection(_connectionString))
                 {
                     connection.Open();
                     string checkTableQuery = "IF OBJECT_ID('dbo.TaxiTrips', 'U') IS NULL SELECT 0 ELSE SELECT 1";
@@ -243,7 +295,7 @@ namespace TestAssessment
                         int tableExists = (int)checkCmd.ExecuteScalar();
                         if (tableExists == 0)
                         {
-                            Console.WriteLine("Table does not exist. Creating table...");
+                            Log.Information("Table does not exist. Creating table...");
                             string createTableScript = @"
                                 CREATE TABLE dbo.TaxiTrips
                                 (
@@ -272,19 +324,19 @@ namespace TestAssessment
                             using (var createCmd = new SqlCommand(createTableScript, connection))
                             {
                                 createCmd.ExecuteNonQuery();
-                                Console.WriteLine("Table and indexes created successfully.");
+                                Log.Information("Table and indexes created successfully.");
                             }
                         }
                         else
                         {
-                            Console.WriteLine("Table TaxiTrips already exists. No action taken.");
+                            Log.Information("Table TaxiTrips already exists. No action taken.");
                         }
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine("An error occurred during initialization: " + ex.Message);
+                Log.Error("An error occurred during initialization: " + ex.Message);
                 return false;
             }
 
