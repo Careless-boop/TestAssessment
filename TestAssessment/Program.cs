@@ -180,6 +180,12 @@ namespace TestAssessment
                         continue;
                     }
 
+                    // Check if pickup time is after dropoff time.
+                    if (trip.tpep_pickup_datetime > trip.tpep_dropoff_datetime)
+                    {
+                        Log.Warning($"Row {csv.Context.Parser.RawRow} has pickup time after dropoff time. Pickup: {trip.tpep_pickup_datetime}, Dropoff: {trip.tpep_dropoff_datetime}");
+                    }
+
                     string key = $"{trip.tpep_pickup_datetime:yyyyMMddHHmmss}_{trip.tpep_dropoff_datetime:yyyyMMddHHmmss}_{trip.passenger_count}";
                     if (uniqueKeys.Contains(key))
                     {
