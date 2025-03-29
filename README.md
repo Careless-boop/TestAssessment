@@ -33,5 +33,8 @@ This is a simple ETL (Extract, Transform, Load) application written in C#. It re
    - When prompted, enter the path to your CSV file.
 4. **Processing:**  
    - The application will process the CSV, log any issues, remove duplicates, and insert valid records into the SQL Server database.
+ 
 ## Working with larger input
 If we were dealing with a much larger file—say, a 10GB CSV—we wouldn’t load it all into memory at once. Instead, we’d break the file into smaller, manageable chunks (for example, 10,000 rows at a time), process each batch, and then insert those records into the database. This way, we keep our memory usage in check. We could also leverage asynchronous and parallel processing to speed things up and make the best use of our resources.
+
+## Number of rows in database after running the program with premade .csv file is 29840!
