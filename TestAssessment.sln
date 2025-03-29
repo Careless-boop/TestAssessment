@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.12.35527.113 d17.12
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestAssessment", "TestAssessment\TestAssessment.csproj", "{69587105-FA4D-406E-B8E7-5ACC393E0F2F}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SqlScripts", "SqlScripts", "{68B95F2F-6EDA-4A48-97C1-F53C0383FF86}"
+	ProjectSection(SolutionItems) = preProject
+		DatabaseCreate.sql = DatabaseCreate.sql
+		TableCreate.sql = TableCreate.sql
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{69587105-FA4D-406E-B8E7-5ACC393E0F2F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{69587105-FA4D-406E-B8E7-5ACC393E0F2F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{69587105-FA4D-406E-B8E7-5ACC393E0F2F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{69587105-FA4D-406E-B8E7-5ACC393E0F2F}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
